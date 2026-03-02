@@ -4,14 +4,41 @@ import replayDataRaw from "../data/replay-data.json";
 
 const replayData = replayDataRaw as ReplayData;
 
-const startTime = new Date(replayData.meta.startTime).getTime();
-const endTime = new Date(replayData.meta.endTime).getTime();
-const duration = endTime - startTime;
+// ── Gap compression ────────────────────────────────────────────
+// Raw session: 8.3 hours with long human-input waits.
+// Compress gaps so the replay feels natural without dead stalls.
+//
+// Strategy:
+//   gap < 60s   → keep as-is (natural conversation pace)
+//   gap 60-300s → compress to 15s + 20% of excess (light squeeze)
+//   gap > 300s  → compress to 30s (hard cap — session breaks)
 
-// Pre-compute event offsets for efficient filtering
-const eventsWithOffset = replayData.events.map((event) => ({
+const GAP_TIER1 = 60_000;   // 1 min in ms
+const GAP_TIER2 = 300_000;  // 5 min in ms
+
+function compressGap(rawGapMs: number): number {
+  if (rawGapMs <= GAP_TIER1) return rawGapMs;
+  if (rawGapMs <= GAP_TIER2) {
+    // 15s base + 20% of excess over 1min
+    return 15_000 + (rawGapMs - GAP_TIER1) * 0.2;
+  }
+  // Hard cap: 30s for anything over 5min
+  return 30_000;
+}
+
+// Pre-compute compressed offsets
+const rawTimes = replayData.events.map((e) => new Date(e.timestamp).getTime());
+const compressedOffsets: number[] = [0];
+for (let i = 1; i < rawTimes.length; i++) {
+  const rawGap = rawTimes[i] - rawTimes[i - 1];
+  compressedOffsets.push(compressedOffsets[i - 1] + compressGap(rawGap));
+}
+
+const duration = compressedOffsets[compressedOffsets.length - 1] || 0;
+
+const eventsWithOffset = replayData.events.map((event, i) => ({
   ...event,
-  _offset: new Date(event.timestamp).getTime() - startTime,
+  _offset: compressedOffsets[i],
 }));
 
 // Pre-compute decision event offsets for skip navigation
@@ -30,8 +57,6 @@ interface ReplayState {
   currentTime: number;
 
   // Derived
-  startTime: number;
-  endTime: number;
   duration: number;
   visibleEvents: ReplayEvent[];
 
@@ -64,8 +89,6 @@ export const useReplayStore = create<ReplayState>((set, get) => ({
   currentTime: 0,
 
   // Derived
-  startTime,
-  endTime,
   duration,
   visibleEvents: [],
 

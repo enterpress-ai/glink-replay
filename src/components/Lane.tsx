@@ -67,7 +67,7 @@ export default function Lane({ agentId, events, latestEventActor }: LaneProps) {
       laneEvents.push({ event: e, kind: "sent" });
     } else if (e.type === "message" && e.actor !== agentId) {
       const data = e.data as MessageData;
-      if (data.to === agentId) {
+      if (data.to === agentId || data.to === null) {
         laneEvents.push({ event: e, kind: "incoming" });
       }
     } else if (e.type === "artifact" && e.actor === agentId) {

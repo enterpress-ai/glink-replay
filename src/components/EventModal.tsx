@@ -41,10 +41,20 @@ function renderEventContent(type: string, data: unknown): React.ReactNode {
     }
     case "artifact": {
       const d = data as ArtifactData;
+      const ghUrl = `https://github.com/bulwark-live/glink-channel/blob/${d.hash}/workspace/active/${d.filename}`;
       return (
         <>
-          <div className="text-sm text-gray-200 mb-1">{d.filename}</div>
-          <div className="text-xs text-gray-500 font-mono">Hash: {d.hash}</div>
+          <a
+            href={ghUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-blue-400 hover:text-blue-300 hover:underline mb-1 block"
+          >
+            {d.filename}
+          </a>
+          <div className="text-xs text-gray-500 font-mono">
+            Hash: <a href={ghUrl} target="_blank" rel="noopener noreferrer" className="hover:text-gray-300">{d.hash}</a>
+          </div>
         </>
       );
     }

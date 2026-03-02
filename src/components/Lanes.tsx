@@ -201,6 +201,7 @@ function EventCard({ event, style, onClick }: EventCardProps) {
 
   if (event.type === "artifact") {
     const data = event.data as ArtifactData;
+    const ghUrl = `https://github.com/bulwark-live/glink-channel/blob/${data.hash}/workspace/active/${data.filename}`;
     return (
       <motion.div
         initial={{ opacity: 0, y: 8 }}
@@ -210,7 +211,15 @@ function EventCard({ event, style, onClick }: EventCardProps) {
         className="p-2.5 rounded-lg border border-gray-700 bg-gray-900/50 text-xs cursor-pointer hover:brightness-125"
       >
         <div className="text-[10px] text-gray-500 mb-0.5">artifact</div>
-        <div className="text-gray-300 truncate">{data.filename}</div>
+        <a
+          href={ghUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="text-gray-300 truncate block hover:text-white hover:underline"
+        >
+          {data.filename}
+        </a>
       </motion.div>
     );
   }

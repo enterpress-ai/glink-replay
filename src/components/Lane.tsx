@@ -1,5 +1,13 @@
 import { useEffect, useRef } from "react";
-import type { AgentId, ReplayEvent, MessageData } from "../types";
+import { motion } from "framer-motion";
+import type {
+  AgentId,
+  ReplayEvent,
+  MessageData,
+  ArtifactData,
+  HandoffData,
+} from "../types";
+import { useModalStore } from "../engine/modal-store";
 
 const AGENT_DISPLAY: Record<
   AgentId,
@@ -28,11 +36,15 @@ const AGENT_DISPLAY: Record<
   },
 };
 
-// Map target agent ID to a short display label
-function targetLabel(to: AgentId | null): string | null {
-  if (!to) return null;
-  const display = AGENT_DISPLAY[to];
-  return display ? display.role : null;
+// Map agent ID to short display label
+function shortLabel(agentId: AgentId): string {
+  const display = AGENT_DISPLAY[agentId];
+  return display ? display.role : agentId;
+}
+
+interface LaneEvent {
+  event: ReplayEvent;
+  kind: "sent" | "incoming" | "artifact" | "handoff";
 }
 
 interface LaneProps {
@@ -44,21 +56,43 @@ interface LaneProps {
 export default function Lane({ agentId, events, latestEventActor }: LaneProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const display = AGENT_DISPLAY[agentId];
+  const openModal = useModalStore((s) => s.open);
 
-  // Filter messages sent BY this agent
-  const messages = events.filter(
-    (e) => e.type === "message" && e.actor === agentId
+  // Build lane events: messages sent by this agent, messages TO this agent,
+  // artifacts by this agent, handoffs by this agent
+  const laneEvents: LaneEvent[] = [];
+
+  for (const e of events) {
+    if (e.type === "message" && e.actor === agentId) {
+      laneEvents.push({ event: e, kind: "sent" });
+    } else if (e.type === "message" && e.actor !== agentId) {
+      const data = e.data as MessageData;
+      if (data.to === agentId) {
+        laneEvents.push({ event: e, kind: "incoming" });
+      }
+    } else if (e.type === "artifact" && e.actor === agentId) {
+      laneEvents.push({ event: e, kind: "artifact" });
+    } else if (e.type === "handoff" && e.actor === agentId) {
+      laneEvents.push({ event: e, kind: "handoff" });
+    }
+  }
+
+  // Sort by timestamp (events are already sorted, but let's be safe)
+  laneEvents.sort(
+    (a, b) =>
+      new Date(a.event.timestamp).getTime() -
+      new Date(b.event.timestamp).getTime()
   );
 
   const isActive = latestEventActor === agentId;
 
-  // Auto-scroll to bottom when new messages appear
+  // Auto-scroll to bottom when event count changes
   useEffect(() => {
     const el = scrollRef.current;
     if (el) {
       el.scrollTop = el.scrollHeight;
     }
-  }, [messages.length]);
+  }, [laneEvents.length]);
 
   return (
     <div className="flex-1 flex flex-col min-w-0 border-r border-gray-800 last:border-r-0">
@@ -80,30 +114,107 @@ export default function Lane({ agentId, events, latestEventActor }: LaneProps) {
         </div>
       </div>
 
-      {/* Scrollable message list */}
+      {/* Scrollable event list */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-2">
-        {messages.map((event) => {
-          const data = event.data as MessageData;
-          const isUrgent = data.urgent;
-          const target = targetLabel(data.to);
+        {laneEvents.map(({ event, kind }) => {
+          if (kind === "sent") {
+            const data = event.data as MessageData;
+            const isUrgent = data.urgent;
+            const target = data.to ? shortLabel(data.to) : null;
 
-          return (
-            <div
-              key={event.id}
-              className={`p-2.5 rounded-lg border text-xs ${display.bgClass} ${
-                isUrgent ? "border-urgent" : display.borderClass
-              }`}
-            >
-              {target && (
-                <div className={`text-[10px] ${display.textClass} opacity-70 mb-1`}>
-                  {"-> "}{target}
+            return (
+              <motion.div
+                key={event.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2 }}
+                onClick={() => openModal(event)}
+                className={`p-2.5 rounded-lg border text-xs cursor-pointer hover:brightness-125 ${display.bgClass} ${
+                  isUrgent ? "border-urgent" : display.borderClass
+                }`}
+              >
+                {target && (
+                  <div
+                    className={`text-[10px] ${display.textClass} opacity-70 mb-1`}
+                  >
+                    {"-> "}
+                    {target}
+                  </div>
+                )}
+                <div className="text-gray-300 line-clamp-3 whitespace-pre-wrap">
+                  {data.body}
                 </div>
-              )}
-              <div className="text-gray-300 line-clamp-3 whitespace-pre-wrap">
-                {data.body}
-              </div>
-            </div>
-          );
+              </motion.div>
+            );
+          }
+
+          if (kind === "incoming") {
+            const data = event.data as MessageData;
+            const senderLabel = shortLabel(event.actor);
+
+            return (
+              <motion.div
+                key={event.id + "-in"}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2 }}
+                onClick={() => openModal(event)}
+                className="p-2.5 rounded-lg border border-dashed border-gray-600 text-xs opacity-60 cursor-pointer hover:brightness-125"
+              >
+                <div className="text-[10px] text-gray-400 mb-1">
+                  {"<- "}
+                  {senderLabel}
+                </div>
+                <div className="text-gray-400 line-clamp-2 whitespace-pre-wrap">
+                  {data.body}
+                </div>
+              </motion.div>
+            );
+          }
+
+          if (kind === "artifact") {
+            const data = event.data as ArtifactData;
+
+            return (
+              <motion.div
+                key={event.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2 }}
+                onClick={() => openModal(event)}
+                className="p-2.5 rounded-lg border border-gray-700 bg-gray-900/50 text-xs cursor-pointer hover:brightness-125"
+              >
+                <div className="text-[10px] text-gray-500 mb-0.5">
+                  artifact
+                </div>
+                <div className="text-gray-300 truncate">{data.filename}</div>
+              </motion.div>
+            );
+          }
+
+          if (kind === "handoff") {
+            const data = event.data as HandoffData;
+
+            return (
+              <motion.div
+                key={event.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2 }}
+                onClick={() => openModal(event)}
+                className="p-2.5 rounded-lg border border-gray-700 text-xs cursor-pointer hover:brightness-125"
+              >
+                <div className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-0.5">
+                  Handoff
+                </div>
+                <div className="text-gray-300 line-clamp-2 whitespace-pre-wrap">
+                  {data.summary}
+                </div>
+              </motion.div>
+            );
+          }
+
+          return null;
         })}
       </div>
     </div>

@@ -4,6 +4,8 @@ import { usePlaybackLoop } from "./hooks/usePlaybackLoop";
 import Header from "./components/Header";
 import Lanes from "./components/Lanes";
 import Timeline from "./components/Timeline";
+import StatsOverlay from "./components/StatsOverlay";
+import EventModal from "./components/EventModal";
 
 const SPEED_MAP: Record<string, number> = {
   "1": 1,
@@ -54,6 +56,8 @@ export default function App() {
       {/* Spacer for fixed timeline */}
       <div className="h-20 shrink-0" />
       <Timeline />
+      <StatsOverlay />
+      <EventModal />
     </div>
   );
 }

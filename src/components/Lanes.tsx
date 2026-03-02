@@ -1,10 +1,11 @@
+import { useMemo } from "react";
 import { useReplayStore } from "../engine/replay-store";
 import { useModalStore } from "../engine/modal-store";
 import type { AgentId } from "../types";
 import Lane from "./Lane";
 import DecisionBanner from "./DecisionBanner";
 
-const AGENTS: AgentId[] = ["Architect-CEO", "Architect-CTO", "Architect-COO"];
+const AGENTS: AgentId[] = ["Architect-CTO", "Architect-CEO", "Architect-COO"];
 
 export default function Lanes() {
   const visibleEvents = useReplayStore((s) => s.visibleEvents);
@@ -18,6 +19,19 @@ export default function Lanes() {
 
   // Filter decisions for banners
   const decisions = visibleEvents.filter((e) => e.type === "decision");
+
+  // Build global sequence map: event id -> 1-based chronological index
+  // Only count events that appear in lanes (messages, artifacts, handoffs)
+  const eventSeqMap = useMemo(() => {
+    const map = new Map<string, number>();
+    let seq = 1;
+    for (const e of visibleEvents) {
+      if (e.type === "message" || e.type === "artifact" || e.type === "handoff") {
+        map.set(e.id, seq++);
+      }
+    }
+    return map;
+  }, [visibleEvents]);
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
@@ -41,6 +55,7 @@ export default function Lanes() {
             key={agentId}
             agentId={agentId}
             events={visibleEvents}
+            eventSeqMap={eventSeqMap}
             latestEventActor={latestEventActor}
           />
         ))}

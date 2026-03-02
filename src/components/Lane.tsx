@@ -50,10 +50,11 @@ interface LaneEvent {
 interface LaneProps {
   agentId: AgentId;
   events: ReplayEvent[];
+  eventSeqMap: Map<string, number>;
   latestEventActor: AgentId | null;
 }
 
-export default function Lane({ agentId, events, latestEventActor }: LaneProps) {
+export default function Lane({ agentId, events, eventSeqMap, latestEventActor }: LaneProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const display = AGENT_DISPLAY[agentId];
   const openModal = useModalStore((s) => s.open);
@@ -117,6 +118,8 @@ export default function Lane({ agentId, events, latestEventActor }: LaneProps) {
       {/* Scrollable event list */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-2">
         {laneEvents.map(({ event, kind }) => {
+          const seq = eventSeqMap.get(event.id);
+
           if (kind === "sent") {
             const data = event.data as MessageData;
             const isUrgent = data.urgent;
@@ -129,10 +132,15 @@ export default function Lane({ agentId, events, latestEventActor }: LaneProps) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.2 }}
                 onClick={() => openModal(event)}
-                className={`p-2.5 rounded-lg border text-xs cursor-pointer hover:brightness-125 ${display.bgClass} ${
+                className={`relative p-2.5 rounded-lg border text-xs cursor-pointer hover:brightness-125 ${display.bgClass} ${
                   isUrgent ? "border-urgent" : display.borderClass
                 }`}
               >
+                {seq && (
+                  <span className="absolute top-1 right-1.5 text-[9px] font-mono text-gray-500 opacity-60">
+                    {seq}
+                  </span>
+                )}
                 {target && (
                   <div
                     className={`text-[10px] ${display.textClass} opacity-70 mb-1`}
@@ -159,8 +167,13 @@ export default function Lane({ agentId, events, latestEventActor }: LaneProps) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.2 }}
                 onClick={() => openModal(event)}
-                className="p-2.5 rounded-lg border border-dashed border-gray-600 text-xs opacity-60 cursor-pointer hover:brightness-125"
+                className="relative p-2.5 rounded-lg border border-dashed border-gray-600 text-xs opacity-60 cursor-pointer hover:brightness-125"
               >
+                {seq && (
+                  <span className="absolute top-1 right-1.5 text-[9px] font-mono text-gray-500">
+                    {seq}
+                  </span>
+                )}
                 <div className="text-[10px] text-gray-400 mb-1">
                   {"<- "}
                   {senderLabel}
@@ -182,8 +195,13 @@ export default function Lane({ agentId, events, latestEventActor }: LaneProps) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.2 }}
                 onClick={() => openModal(event)}
-                className="p-2.5 rounded-lg border border-gray-700 bg-gray-900/50 text-xs cursor-pointer hover:brightness-125"
+                className="relative p-2.5 rounded-lg border border-gray-700 bg-gray-900/50 text-xs cursor-pointer hover:brightness-125"
               >
+                {seq && (
+                  <span className="absolute top-1 right-1.5 text-[9px] font-mono text-gray-500">
+                    {seq}
+                  </span>
+                )}
                 <div className="text-[10px] text-gray-500 mb-0.5">
                   artifact
                 </div>
@@ -202,8 +220,13 @@ export default function Lane({ agentId, events, latestEventActor }: LaneProps) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.2 }}
                 onClick={() => openModal(event)}
-                className="p-2.5 rounded-lg border border-gray-700 text-xs cursor-pointer hover:brightness-125"
+                className="relative p-2.5 rounded-lg border border-gray-700 text-xs cursor-pointer hover:brightness-125"
               >
+                {seq && (
+                  <span className="absolute top-1 right-1.5 text-[9px] font-mono text-gray-500">
+                    {seq}
+                  </span>
+                )}
                 <div className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-0.5">
                   Handoff
                 </div>

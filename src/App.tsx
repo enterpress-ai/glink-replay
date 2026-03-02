@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { AnimatePresence } from "framer-motion";
 import { useReplayStore } from "./engine/replay-store";
 import { usePlaybackLoop } from "./hooks/usePlaybackLoop";
 import Header from "./components/Header";
@@ -6,6 +7,7 @@ import Lanes from "./components/Lanes";
 import Timeline from "./components/Timeline";
 import StatsOverlay from "./components/StatsOverlay";
 import EventModal from "./components/EventModal";
+import IntroOverlay from "./components/IntroOverlay";
 
 const SPEED_MAP: Record<string, number> = {
   "1": 1,
@@ -16,7 +18,13 @@ const SPEED_MAP: Record<string, number> = {
 };
 
 export default function App() {
+  const [showIntro, setShowIntro] = useState(true);
   usePlaybackLoop();
+
+  const handleDismiss = useCallback(() => {
+    setShowIntro(false);
+    useReplayStore.getState().play();
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -25,6 +33,15 @@ export default function App() {
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement
       ) {
+        return;
+      }
+
+      // During intro, only Enter dismisses
+      if (showIntro) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          handleDismiss();
+        }
         return;
       }
 
@@ -47,7 +64,7 @@ export default function App() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [showIntro, handleDismiss]);
 
   return (
     <div className="h-screen flex flex-col bg-gray-950 text-white">
@@ -58,6 +75,9 @@ export default function App() {
       <Timeline />
       <StatsOverlay />
       <EventModal />
+      <AnimatePresence>
+        {showIntro && <IntroOverlay onDismiss={handleDismiss} />}
+      </AnimatePresence>
     </div>
   );
 }
